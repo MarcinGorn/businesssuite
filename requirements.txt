@@ -1,0 +1,4 @@
+pygame==2.6.1
+numpy==2.1.1
+msgspec==0.18.6
+
