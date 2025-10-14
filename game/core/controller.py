@@ -65,7 +65,7 @@ class GameController:
                     sector="retail",
                     location="City A",
                     capacity=100.0,
-                    inventory=30.0,
+                    finished_goods=30.0,
                     unit_cost=8.0,
                     unit_price=12.0,
                     employees=5,

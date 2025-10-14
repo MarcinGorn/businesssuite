@@ -10,7 +10,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Run
+Runupdate busin
 ```
 python main.py
 ```
