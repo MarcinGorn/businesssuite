@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from typing import List, Literal
 
 from game.core.models import GameState
+try:
+    from game.systems.finance import Finance
+except Exception:
+    Finance = None  # type: ignore
 
 
 @dataclass
@@ -21,6 +25,7 @@ class TaxAuthority:
         self._accum_income = 0.0
         self._days = 0
         self.ledger: List[dict] = []  # simple transaction ledger
+        self.finance: Finance | None = None
 
     def accrue_daily(self) -> None:
         # Approximate profits as sum of business rolling profits scaled
@@ -48,6 +53,8 @@ class TaxAuthority:
             # penalize credit if unpaid fully
             self.state.player.credit_score = max(300, self.state.player.credit_score - int(shortfall / 1000))
         self._record("tax_payment", -total_due)
+        if self.finance and total_due > 0:
+            self.finance.record_tax(total_due, note="Monthly tax settlement")
 
     def _record(self, kind: str, amount: float) -> None:
         self.ledger.append({

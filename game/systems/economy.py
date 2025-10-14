@@ -6,6 +6,16 @@ import math
 import random
 
 from game.core.models import GameState
+from game.systems.supply_chain import SupplyChain
+from typing import Optional
+try:
+    from game.systems.finance import Finance
+except Exception:
+    Finance = None  # type: ignore
+try:
+    from game.systems.objectives import Objectives
+except Exception:
+    Objectives = None  # type: ignore
 
 
 @dataclass
@@ -22,6 +32,9 @@ class EconomyEngine:
         self.state = state
         self.config = config or EconomyConfig()
         self._cycle_angle = 0.0
+        self.supply = SupplyChain(self.state)
+        self.finance: Optional[Finance] = None  # injected
+        self.objectives: Optional[Objectives] = None  # injected
 
     def simulate_day(self) -> None:
         self._update_macro()
@@ -74,6 +87,12 @@ class EconomyEngine:
     def _simulate_businesses(self) -> None:
         # Simple pricing power: higher demand and lower competition allow higher margin
         for biz in self.state.businesses:
+            # Supply chain step: advance orders, maybe reorder, produce
+            self.supply.advance_orders(biz)
+            self.supply.maybe_reorder(biz)
+            carrying_cost = self.supply.produce(biz)
+            if self.finance and carrying_cost > 0:
+                self.finance.record_opex(carrying_cost, note=f"Carrying cost {biz.id}")
             demand_idx = self.state.market.sector_demand.get(biz.sector, 1.0)
             competition_idx = self.state.market.sector_competition.get(biz.sector, 1.0)
             pricing_power = demand_idx / max(0.5, competition_idx)
@@ -87,7 +106,7 @@ class EconomyEngine:
 
             # Sales volume driven by demand and capacity
             base_sales = biz.capacity * demand_idx
-            realized_sales = min(base_sales, biz.inventory + biz.capacity)
+            realized_sales = min(base_sales, biz.finished_goods)
             revenue = realized_sales * biz.unit_price
             cost = realized_sales * biz.unit_cost
             profit = revenue - cost
@@ -97,5 +116,19 @@ class EconomyEngine:
             # Update player aggregates
             self.state.player.cash += profit
             self.state.player.assets_value += max(0.0, profit) * 0.2
+            # Reduce finished goods by sales
+            biz.finished_goods = max(0.0, biz.finished_goods - realized_sales)
+
+            # Record finance and objectives
+            if self.finance:
+                if revenue > 0:
+                    self.finance.record_revenue(revenue, note=f"Sales {biz.id}")
+                if cost > 0:
+                    self.finance.record_cogs(cost, note=f"COGS {biz.id}")
+            if self.objectives and revenue > 0:
+                try:
+                    self.objectives.record_revenue(revenue)
+                except Exception:
+                    pass
 
 

@@ -29,6 +29,8 @@ Controls
 - T: travel between cities (cycles A -> B -> C)
 - N: create a new retail business (starter)
 - U: upgrade the first business
+- Procurement: R/F = reorder point +/-; O/P = order qty +/-; M = manual order
+- Views: F1 Dashboard, F2 Finance (P&L), F3 Objectives
 
 Architecture
 - game/core: controller, models, events

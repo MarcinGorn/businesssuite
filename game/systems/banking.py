@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from typing import List
 
 from game.core.models import GameState
+try:
+    from game.systems.finance import Finance
+except Exception:
+    Finance = None  # type: ignore
 
 
 @dataclass
@@ -28,6 +32,7 @@ class Bank:
     def __init__(self, state: GameState) -> None:
         self.state = state
         self.loans: List[Loan] = []
+        self.finance: Finance | None = None
 
     def request_loan(self, amount: float, term_days: int = 365) -> bool:
         if amount <= 0:
@@ -49,6 +54,8 @@ class Bank:
             interest = loan.remaining * daily_rate
             loan.remaining += interest
             loan.term_days -= 1
+            if self.finance and interest > 0:
+                self.finance.record_interest(interest, note="Loan interest")
             # Auto minimum payment if possible
             min_payment = loan.principal / 365
             payment = min(min_payment + interest, loan.remaining)

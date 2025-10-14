@@ -18,6 +18,10 @@ from game.ui.views import DashboardView
 from game.ui.charts import line_chart
 from game.ui.theme import Theme
 from game.ui.tutorial import Tutorial
+from game.systems.finance import Finance
+from game.systems.objectives import Objectives
+from game.ui.finance_view import FinanceView
+from game.ui.objectives_view import ObjectivesView
 
 
 class GameController:
@@ -36,10 +40,22 @@ class GameController:
         self.events_sys = EventSystem(self.state)
         self.tax = TaxAuthority(self.state)
         self.travel_mgr = TravelManager(self.state)
+        # Load balance for supply chain
+        self._load_balance()
+        self.economy.supply.apply_balance_config(self._balance)
 
         # UI
         self.view = DashboardView(self.screen)
         self.tutorial = Tutorial()
+        self.finance = Finance(self.state)
+        self.objectives = Objectives(self.state)
+        self.finance_view = FinanceView(self.screen, self.finance, self.bank, self.economy.supply)
+        self.objectives_view = ObjectivesView(self.screen, self.objectives)
+        # Inject finance/objectives into systems
+        self.economy.finance = self.finance
+        self.economy.objectives = self.objectives
+        self.bank.finance = self.finance
+        self.tax.finance = self.finance
 
         # Ensure starting business
         if not self.state.businesses:
@@ -88,6 +104,32 @@ class GameController:
                 self._create_business()
             if event.key == pygame.K_u:
                 self._upgrade_business()
+            # Procurement UI
+            if event.key == pygame.K_r:  # adjust reorder point +10
+                if self.state.businesses:
+                    self.state.businesses[0].reorder_point += 10
+            if event.key == pygame.K_f:  # adjust reorder point -10
+                if self.state.businesses:
+                    self.state.businesses[0].reorder_point = max(0, self.state.businesses[0].reorder_point - 10)
+            if event.key == pygame.K_o:  # adjust order qty +25
+                if self.state.businesses:
+                    self.state.businesses[0].order_quantity += 25
+            if event.key == pygame.K_p:  # adjust order qty -25
+                if self.state.businesses:
+                    self.state.businesses[0].order_quantity = max(0, self.state.businesses[0].order_quantity - 25)
+            if event.key == pygame.K_m:  # manual order for first input type
+                if self.state.businesses:
+                    biz = self.state.businesses[0]
+                    inputs = list(self.economy.supply.recipes.get(biz.sector, self.economy.supply.recipes["retail"]).inputs.keys())
+                    if inputs:
+                        self.economy.supply.place_order(biz, inputs[0], max(1.0, biz.order_quantity))
+            # View toggles
+            if event.key == pygame.K_F1:
+                self.view.mode = "dashboard"
+            if event.key == pygame.K_F2:
+                self.view.mode = "finance"
+            if event.key == pygame.K_F3:
+                self.view.mode = "objectives"
 
     def update(self, dt_seconds: float) -> None:
         # Accumulate time and simulate daily steps approx every second for demo
@@ -102,16 +144,30 @@ class GameController:
             self.ai.tick_daily()
             self.events_sys.tick_daily()
             self.tax.accrue_daily()
+            # Update objectives daily
+            self.objectives.tick_daily()
             self._accum -= 1.0
 
     def render(self) -> None:
-        self.view.render(self.state)
+        mode = getattr(self.view, "mode", "dashboard")
+        if mode == "finance":
+            self.finance_view.render()
+        elif mode == "objectives":
+            self.objectives_view.render()
+        else:
+            self.view.render(self.state)
         # Simple chart panel for TECH ticker
         w, h = self.screen.get_size()
         rect = pygame.Rect(20, 220, w - 40, h - 240)
         tech_history = self.state.market.stock_prices.get("TECH", [])
         line_chart(self.screen, tech_history, rect)
         self.tutorial.render(self.screen)
+        # Procurement hints
+        w, h = self.screen.get_size()
+        help_rect = pygame.Rect(400, 220, w - 420, 160)
+        pygame.draw.rect(self.screen, Theme.PANEL, help_rect, border_radius=8)
+        label = Theme.font(14).render("Procurement: [R/F] Reorder +/-  [O/P] OrderQty +/-  [M] Manual Order", True, Theme.TEXT_MUTED)
+        self.screen.blit(label, (help_rect.x + 12, help_rect.y + 12))
 
     def save(self, slot: int) -> None:
         self.save_manager.save(self.state, slot=slot, autosave=False)
@@ -190,5 +246,15 @@ class GameController:
         self.state.player.cash -= upgrade_cost
         biz.capacity *= 1.15
         biz.unit_cost *= 0.98
+
+    # --- Config loading ---
+    def _load_balance(self) -> None:
+        import json, os
+        path = os.path.join(self.config_dir, "balance.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                self._balance = json.load(f)
+        except Exception:
+            self._balance = {}
 
 

@@ -24,12 +24,18 @@ class Business:
     sector: str = "retail"  # retail, manufacturing, real_estate, tech
     location: str = "City A"
     capacity: float = 0.0  # production or service capacity
-    inventory: float = 0.0
+    # Supply chain & inventory
+    inputs_stock: Dict[str, float] = field(default_factory=dict)  # input_name -> qty
+    finished_goods: float = 0.0
     unit_cost: float = 0.0
     unit_price: float = 0.0
     employees: int = 0
     revenue_rolling: float = 0.0
     profit_rolling: float = 0.0
+    carrying_cost_rate_daily: float = 0.0003  # cost to hold inventory per day
+    reorder_point: float = 50.0  # simple single-threshold for each input
+    order_quantity: float = 150.0
+    active_orders: List[Dict[str, Any]] = field(default_factory=list)  # {input, qty, eta_days, unit_cost}
 
 
 @dataclass

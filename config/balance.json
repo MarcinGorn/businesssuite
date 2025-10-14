@@ -16,6 +16,13 @@
   "stock_market": {
     "volatility": 0.02,
     "trend_strength": 0.001
+  },
+  "supply_chain": {
+    "input_unit_costs": {
+      "parts": 4.0,
+      "materials": 2.5
+    },
+    "lead_time_days": [3, 8]
   }
 }
 

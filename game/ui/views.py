@@ -11,6 +11,7 @@ from game.core.models import GameState
 class DashboardView:
     def __init__(self, screen: pygame.Surface) -> None:
         self.screen = screen
+        self.mode = "dashboard"  # dashboard | finance | objectives
 
     def render(self, state: GameState) -> None:
         self.screen.fill(Theme.BG)
@@ -20,6 +21,8 @@ class DashboardView:
         title_font = Theme.font(24)
         title = title_font.render("BizSim Dashboard", True, Theme.TEXT_PRIMARY)
         self.screen.blit(title, (20, 12))
+        mode_hint = Theme.font(14).render("[F1] Dashboard  [F2] Finance  [F3] Objectives", True, Theme.TEXT_MUTED)
+        self.screen.blit(mode_hint, (width - 400, 16))
 
         # Panels
         panel_rect = pygame.Rect(20, 50, width - 40, 160)
@@ -63,5 +66,20 @@ class DashboardView:
         info = f"Ticker: {ticker} | Price: {last_price:.2f} | Shares: {position}  [1-4 switch, ,/. buy/sell]"
         info_surf = label_font.render(info, True, Theme.TEXT_PRIMARY)
         self.screen.blit(info_surf, (bottom_panel.x + 12, bottom_panel.y + 22))
+
+        # Inventory panel for first business
+        inv_rect = pygame.Rect(20, 220, 360, 160)
+        pygame.draw.rect(self.screen, Theme.PANEL, inv_rect, border_radius=8)
+        inv_title = label_font.render("Inventory (BIZ-1)", True, Theme.TEXT_PRIMARY)
+        self.screen.blit(inv_title, (inv_rect.x + 10, inv_rect.y + 8))
+        if state.businesses:
+            biz0 = state.businesses[0]
+            y2 = inv_rect.y + 34
+            for name, qty in biz0.inputs_stock.items():
+                row = label_font.render(f"{name}: {qty:.1f}", True, Theme.TEXT_MUTED)
+                self.screen.blit(row, (inv_rect.x + 12, y2))
+                y2 += 20
+            fg = label_font.render(f"Finished: {biz0.finished_goods:.1f}", True, Theme.TEXT_PRIMARY)
+            self.screen.blit(fg, (inv_rect.x + 12, y2))
 
 
